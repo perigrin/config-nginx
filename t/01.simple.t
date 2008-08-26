@@ -16,4 +16,11 @@ ok $conf->input(
 );
 
 ok my $out = $conf->process;
-like $out, qr/^\s+server_name test\.org \*\.test\.org;\s+$/smi;
+like $out, qr/^\s+\Qserver_name test.org *.test.org;\E\s+$/smi;
+TODO: {
+    $TODO = "These don't work";
+    like $out, qr|^\s+\Qfastcgi_pass /tmp/test.org.socket;\E\s+$|smi;
+    like $out,
+      qr|^\s+include\s+/var/www/sites/test.org/conf/fastcgi_params;\s+$|smi;
+    like $out, qr|^\s+root\s+/var/www/sites/test.org/root\s+$|smi;
+}
