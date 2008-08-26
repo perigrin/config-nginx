@@ -2,84 +2,67 @@ package Config::Nginx;
 use strict;
 our $VERSION = '0.0.1';
 use Moose;
-# 
-# with qw(
-#   MooseX::Getopt
-#   MooseX::SimpleConfig
-# );
-# 
-# # daemon
-# has daemon => (
-#     isa       => 'Str',
+use Moose::Util::TypeConstraints;
+use MooseX::Types::Path::Class qw( File );
+use MooseX::Getopt;
+use Template::Alloy;
+use Config::Any;
+
+has template => (
+    isa     => File,
+    is      => 'rw',
+    coerce  => 1,
+    lazy    => 1,
+    default => 'templates/default.tmpl',
+);
+
+subtype 'NginxConfigData' => as 'HashRef';
+
+has input => (
+    isa => 'NginxConfigData',
+    is  => 'rw',
+);
+
+# has output => (
+#     isa       => 'Maybe[File]',
 #     is        => 'ro',
-#     predicate => 'daemon_set',
-#     lazy      => 1,
-#     default   => sub { off },
+#     predicate => 'print_to_file',
+#     coerce    => 1,
 # );
-# 
-# # env
-# 
-# # debug_points
-# # error_log
-# has error_log => (
-#     isa     => 'Str',
-#     is      => 'ro',
-#     default => sub { 'log/error_log' },
-# );
-# 
-# # log_not_found
-# # include
-# # lock_file
-# # master_process
-# # pid
-# has pid => (
-#     isa     => 'Str',
-#     is      => 'ro',
-#     default => sub { 'log/nginx.pid' },
-# );
-# 
-# # ssl_engine
-# # timer_resolution
-# # user
-# has user => (
-#     isa     => 'Str',
-#     is      => 'ro',
-#     default => sub { 'www www' },
-# );
-# 
-# # worker_cpu_affinity
-# # worker_priority
-# # worker_processes
-# has worker_processes => (
-#     isa     => 'Int',
-#     is      => 'ro',
-#     default => sub { 5 },
-# );
-# 
-# # worker_rlimit_core
-# # worker_rlimit_nofile
-# has worker_rlimit_nofile => (
-#     isa     => 'Int',
-#     is      => 'ro',
-#     default => sub { 8192 },
-# );
-# 
-# # worker_rlimit_sigpending
-# # working_directory
-# 
-# has events => (
-#     isa     => 'Config::Nginx::Events',
-#     is      => 'ro',
-#     default => sub { Config::Nginx::Events->new_with_options },
-# );
-# 
-# has http => (
-#     isa     => 'Config::Nginx::HTTP',
-#     is      => 'ro',
-#     default => sub { Config::Nginx::HTTP->new_with_options },
-# );
-# 
-# sub print { print $_[0]->dump }
+
+has _template_engine => (
+    isa        => 'Template::Alloy',
+    is         => 'ro',
+    lazy_build => 1,
+);
+
+sub _build__template_engine {
+    my ($self) = @_;
+    Template::Alloy->new(
+        INCLUDE_PATH => [ $self->template->dir->absolute->parent->stringify ],
+    );
+}
+
+sub process {
+    my $out      = '';
+    my $t        = $_[0]->_template_engine;
+    my $template = $_[0]->template;
+    $t->process( $template->relative->stringify, $_[0]->input, \$out )
+      || confess $t->error;
+    warn $out;
+    return $out;
+}
+
+# sub save {
+#     my ($self) = @_;
+#     my $output = $self->process();
+#     unless ( $self->print_to_file ) {
+#         print STDOUT $output;
+#         return;
+#     }
+#     open my $fh, $self->output;
+#     print $fh $output;
+# }
 
 no Moose;  # unimport Moose's keywords so they won't accidentally become methods
 1;         # Magic true value required at end of module
